@@ -4,9 +4,9 @@ import dotenv from "dotenv";
 import session from "express-session";
 import MongoStore from "connect-mongo";
 import path from "path";
-import serverless from "serverless-http";
+import serverless from "serverless-http";  // ✅ Add this
 
-// routes
+// Import routes
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
@@ -15,26 +15,21 @@ import bannerRoutes from "./routes/bannerRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
-// DB connect
-import connectDB from "./config/db.js";
+import DBConnect from "./config/db.js";
 import { ErrorHandler } from "./middleware/ErrorHandler.js";
 
 dotenv.config();
 
-const app = express();
+const FRONT_END_URL = process.env.FRONT_END_URL || "http://localhost:3000";
+const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "http://localhost:5173";
 
-// connect database (only once)
-connectDB();
+const app = express();
 
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-const FRONT_END_URL = process.env.FRONT_END_URL || "http://localhost:3000";
-const ADMIN_DASHBOARD_URL =
-  process.env.ADMIN_DASHBOARD_URL || "http://localhost:5173";
-
-// cors
+// CORS
 app.use(
   cors({
     origin: [FRONT_END_URL, ADMIN_DASHBOARD_URL],
@@ -44,10 +39,10 @@ app.use(
   })
 );
 
-// session
+// Sessions
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "fallbacksecret",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
@@ -65,11 +60,17 @@ app.use(
   })
 );
 
-// static files
+// Debug
+app.use((req, res, next) => {
+  console.log("Session ID:", req.sessionID);
+  next();
+});
+
+// Static files
 const dirname = path.resolve();
 app.use("/uploads", express.static(path.join(dirname, "/uploads")));
 
-// routes
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/product", productRoutes);
@@ -78,14 +79,19 @@ app.use("/api/banner", bannerRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/admin", adminRoutes);
 
-// test route (for debugging Vercel deploy)
-app.get("/api/ping", (req, res) => {
-  res.json({ message: "Backend is live 🚀" });
+// Test route
+app.get("/api/test-session", (req, res) => {
+  res.json({
+    sessionID: req.sessionID,
+    hasUser: !!req.session?.user,
+  });
 });
 
-// error handler
+// Error middleware
 app.use(ErrorHandler);
 
-// export for Vercel serverless
-export const handler = serverless(app);
-export default handler;
+// ✅ Export serverless handler for Vercel
+export default serverless(app);
+
+// ✅ Database connect only once
+DBConnect();
