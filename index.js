@@ -16,19 +16,23 @@ import orderRoutes from "./routes/orderRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
 // DB connect
-import DBConnect from "./config/db.js";
+import connectDB from "./config/db.js";
 import { ErrorHandler } from "./middleware/ErrorHandler.js";
 
 dotenv.config();
 
 const app = express();
 
+// connect database (only once)
+connectDB();
+
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const FRONT_END_URL = process.env.FRONT_END_URL || "http://localhost:3000";
-const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "http://localhost:5173";
+const ADMIN_DASHBOARD_URL =
+  process.env.ADMIN_DASHBOARD_URL || "http://localhost:5173";
 
 // cors
 app.use(
@@ -36,28 +40,28 @@ app.use(
     origin: [FRONT_END_URL, ADMIN_DASHBOARD_URL],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
   })
 );
 
 // session
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || "fallbacksecret",
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: process.env.MONGO_URI,
       collectionName: "sessions",
-      ttl: 14 * 24 * 60 * 60
+      ttl: 14 * 24 * 60 * 60,
     }),
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 1000 * 60 * 60 * 24
+      maxAge: 1000 * 60 * 60 * 24,
     },
-    rolling: true
+    rolling: true,
   })
 );
 
@@ -74,9 +78,14 @@ app.use("/api/banner", bannerRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/admin", adminRoutes);
 
+// test route (for debugging Vercel deploy)
+app.get("/api/ping", (req, res) => {
+  res.json({ message: "Backend is live 🚀" });
+});
+
 // error handler
 app.use(ErrorHandler);
 
-// ✅ instead of app.listen
-DBConnect();
-export default serverless(app);
+// export for Vercel serverless
+export const handler = serverless(app);
+export default handler;
