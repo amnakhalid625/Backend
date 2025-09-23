@@ -25,23 +25,22 @@ const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "http://localhost
 
 const app = express();
 
-// ✅ FIXED: Shorter timeout (15 seconds instead of 25)
+// ✅ ONLY CHANGE: Add timeout middleware (15 seconds)
 app.use((req, res, next) => {
   const timeout = setTimeout(() => {
     console.log('Request timeout for:', req.url);
     if (!res.headersSent) {
       res.status(408).json({ error: 'Request timeout' });
     }
-  }, 15000); // 15 seconds instead of 25
+  }, 15000); // 15 seconds
 
-  // Cleanup timeout on response
   res.on('finish', () => clearTimeout(timeout));
   res.on('close', () => clearTimeout(timeout));
   
   next();
 });
 
-// Middlewares
+// middlewares
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -49,22 +48,16 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(
   cors({
     origin: [FRONT_END_URL, ADMIN_DASHBOARD_URL],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
     optionsSuccessStatus: 200,
   })
 );
 
-// ✅ FIXED: Database connection with timeout
+// Database connection per request
 app.use(async (req, res, next) => {
   try {
-    // Add timeout for database connection
-    const dbTimeout = setTimeout(() => {
-      throw new Error('Database connection timeout');
-    }, 8000); // 8 second timeout for DB connection
-
     await DBConnect();
-    clearTimeout(dbTimeout);
     next();
   } catch (error) {
     console.error("Database connection failed:", error);
@@ -74,7 +67,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-// ✅ FIXED: Sessions with connection timeout
+// Sessions
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
@@ -86,12 +79,6 @@ app.use(
       ttl: 14 * 24 * 60 * 60,
       autoRemove: 'native',
       touchAfter: 24 * 3600,
-      // ✅ ADD: Connection timeout for session store
-      mongoOptions: {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 10000,
-        connectTimeoutMS: 10000,
-      }
     }),
     cookie: {
       httpOnly: true,
@@ -103,98 +90,49 @@ app.use(
   })
 );
 
-// Health check route
-app.get("/", (req, res) => {
-  res.json({ 
-    status: "OK", 
-    message: "Server is running",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
+// Debug
+app.use((req, res, next) => {
+  console.log("Session ID:", req.sessionID);
+  next();
 });
-
-// MongoDB connection test route
-app.get("/api/test-mongo", async (req, res) => {
-  try {
-    const mongoose = await import('mongoose');
-    
-    const connectionState = mongoose.connection.readyState;
-    const states = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting'
-    };
-
-    res.json({
-      mongoStatus: states[connectionState],
-      host: mongoose.connection.host || 'not connected',
-      name: mongoose.connection.name || 'no database',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// ✅ FIXED: Routes with shorter timeout (15 seconds)
-const createRouteWithTimeout = (route) => {
-  return (req, res, next) => {
-    const timeout = setTimeout(() => {
-      if (!res.headersSent) {
-        res.status(504).json({ error: "Route timeout" });
-      }
-    }, 15000); // 15 seconds instead of 25
-    
-    // Better cleanup
-    const cleanup = () => clearTimeout(timeout);
-    res.on('finish', cleanup);
-    res.on('close', cleanup);
-    
-    route(req, res, next);
-  };
-};
 
 // Static files
 const dirname = path.resolve();
 app.use("/uploads", express.static(path.join(dirname, "/uploads")));
 
-// ✅ ALL YOUR APIs ARE HERE - INTACT
-app.use("/api/auth", createRouteWithTimeout(authRoutes));
-app.use("/api/user", createRouteWithTimeout(userRoutes));
-app.use("/api/product", createRouteWithTimeout(productRoutes));
-app.use("/api/category", createRouteWithTimeout(categoryRoutes));
-app.use("/api/banner", createRouteWithTimeout(bannerRoutes));
-app.use("/api/order", createRouteWithTimeout(orderRoutes));
-app.use("/api/admin", createRouteWithTimeout(adminRoutes));
+// ✅ Health check route (ADD THIS)
+app.get("/", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    message: "Server is running",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/product", productRoutes);
+app.use("/api/category", categoryRoutes);
+app.use("/api/banner", bannerRoutes);
+app.use("/api/order", orderRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Test route
 app.get("/api/test-session", (req, res) => {
   res.json({
     sessionID: req.sessionID,
     hasUser: !!req.session?.user,
-    timestamp: new Date().toISOString()
   });
 });
 
-// Favicon handler
+// ✅ ADD: Favicon handler
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end();
 });
 
 // Error middleware
 app.use(ErrorHandler);
-
-// Catch-all handler
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    path: req.originalUrl 
-  });
-});
 
 // Export serverless handler for Vercel
 export default serverless(app);
