@@ -25,14 +25,19 @@ const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "http://localhost
 
 const app = express();
 
-// ✅ Global timeout middleware
+// ✅ FIXED: Shorter timeout (15 seconds instead of 25)
 app.use((req, res, next) => {
-  res.setTimeout(25000, () => {
+  const timeout = setTimeout(() => {
     console.log('Request timeout for:', req.url);
     if (!res.headersSent) {
       res.status(408).json({ error: 'Request timeout' });
     }
-  });
+  }, 15000); // 15 seconds instead of 25
+
+  // Cleanup timeout on response
+  res.on('finish', () => clearTimeout(timeout));
+  res.on('close', () => clearTimeout(timeout));
+  
   next();
 });
 
@@ -50,10 +55,16 @@ app.use(
   })
 );
 
-// ✅ Database connection per request (not at startup)
+// ✅ FIXED: Database connection with timeout
 app.use(async (req, res, next) => {
   try {
+    // Add timeout for database connection
+    const dbTimeout = setTimeout(() => {
+      throw new Error('Database connection timeout');
+    }, 8000); // 8 second timeout for DB connection
+
     await DBConnect();
+    clearTimeout(dbTimeout);
     next();
   } catch (error) {
     console.error("Database connection failed:", error);
@@ -63,7 +74,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Sessions - Optimized for serverless
+// ✅ FIXED: Sessions with connection timeout
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
@@ -74,7 +85,13 @@ app.use(
       collectionName: "sessions",
       ttl: 14 * 24 * 60 * 60,
       autoRemove: 'native',
-      touchAfter: 24 * 3600, // lazy session update
+      touchAfter: 24 * 3600,
+      // ✅ ADD: Connection timeout for session store
+      mongoOptions: {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
+      }
     }),
     cookie: {
       httpOnly: true,
@@ -86,7 +103,7 @@ app.use(
   })
 );
 
-// ✅ Health check route
+// Health check route
 app.get("/", (req, res) => {
   res.json({ 
     status: "OK", 
@@ -96,7 +113,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// ✅ MongoDB connection test route
+// MongoDB connection test route
 app.get("/api/test-mongo", async (req, res) => {
   try {
     const mongoose = await import('mongoose');
@@ -123,27 +140,19 @@ app.get("/api/test-mongo", async (req, res) => {
   }
 });
 
-// ✅ Routes with timeout protection
+// ✅ FIXED: Routes with shorter timeout (15 seconds)
 const createRouteWithTimeout = (route) => {
   return (req, res, next) => {
     const timeout = setTimeout(() => {
       if (!res.headersSent) {
         res.status(504).json({ error: "Route timeout" });
       }
-    }, 25000);
+    }, 15000); // 15 seconds instead of 25
     
-    const originalSend = res.send;
-    const originalJson = res.json;
-    
-    res.send = function(...args) {
-      clearTimeout(timeout);
-      return originalSend.apply(this, args);
-    };
-    
-    res.json = function(...args) {
-      clearTimeout(timeout);
-      return originalJson.apply(this, args);
-    };
+    // Better cleanup
+    const cleanup = () => clearTimeout(timeout);
+    res.on('finish', cleanup);
+    res.on('close', cleanup);
     
     route(req, res, next);
   };
@@ -153,7 +162,7 @@ const createRouteWithTimeout = (route) => {
 const dirname = path.resolve();
 app.use("/uploads", express.static(path.join(dirname, "/uploads")));
 
-// Routes with timeout protection
+// ✅ ALL YOUR APIs ARE HERE - INTACT
 app.use("/api/auth", createRouteWithTimeout(authRoutes));
 app.use("/api/user", createRouteWithTimeout(userRoutes));
 app.use("/api/product", createRouteWithTimeout(productRoutes));
@@ -171,7 +180,7 @@ app.get("/api/test-session", (req, res) => {
   });
 });
 
-// ✅ Favicon handler (prevents 404s)
+// Favicon handler
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end();
 });
@@ -179,7 +188,7 @@ app.get('/favicon.ico', (req, res) => {
 // Error middleware
 app.use(ErrorHandler);
 
-// ✅ Catch-all handler
+// Catch-all handler
 app.use('*', (req, res) => {
   res.status(404).json({ 
     error: 'Route not found',
@@ -189,6 +198,3 @@ app.use('*', (req, res) => {
 
 // Export serverless handler for Vercel
 export default serverless(app);
-
-// ✅ Remove this line - don't connect at startup
-// DBConnect();
