@@ -69,13 +69,17 @@ app.use(
     })
 );
 
-// Handle preflight requests explicitly
-app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.sendStatus(200);
+// Handle preflight requests explicitly - Fixed syntax
+app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+        res.header('Access-Control-Allow-Origin', req.headers.origin);
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.sendStatus(200);
+    } else {
+        next();
+    }
 });
 
 // Session configuration
@@ -158,4 +162,4 @@ app.listen(PORT, async () => {
     console.log('Admin Dashboard URL:', ADMIN_DASHBOARD_URL);
     console.log('Frontend URL:', FRONT_END_URL);
     await DBConnect();
-})
+});
