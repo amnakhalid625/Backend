@@ -31,20 +31,56 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// CORS configuration - BEFORE session middleware
+// Enhanced CORS configuration
 app.use(
     cors({
-        origin: [FRONT_END_URL, ADMIN_DASHBOARD_URL],
-        methods: ["GET", "POST", "PUT", "DELETE"],
-        credentials: true, // This is crucial for session cookies
+        origin: function (origin, callback) {
+            // Allow requests with no origin (like mobile apps or curl requests)
+            if (!origin) return callback(null, true);
+            
+            const allowedOrigins = [
+                FRONT_END_URL, 
+                ADMIN_DASHBOARD_URL,
+                'https://admin-gray-mu.vercel.app', // Hardcode your admin URL as backup
+                'http://localhost:5173', // For local development
+                'http://localhost:3000'  // For local development
+            ];
+            
+            if (allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                console.log('CORS blocked origin:', origin);
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: [
+            'Origin',
+            'X-Requested-With', 
+            'Content-Type', 
+            'Accept',
+            'Authorization',
+            'Cache-Control',
+            'Pragma'
+        ],
+        credentials: true,
         optionsSuccessStatus: 200
     })
 );
 
-// Session configuration - AFTER CORS
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+});
+
+// Session configuration
 app.use(
     session({
-        secret: process.env.SESSION_SECRET,
+        secret: process.env.SESSION_SECRET || 'your-fallback-secret',
         resave: false,
         saveUninitialized: false,
         store: MongoStore.create({
@@ -54,19 +90,29 @@ app.use(
         }),
         cookie: {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production", // false for development
+            secure: process.env.NODE_ENV === "production",
             sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             maxAge: 1000 * 60 * 60 * 24, // 24 hours
         },
-        rolling: true, // Reset expiration on each request
+        rolling: true,
     })
 );
 
-// Debug middleware to log session info
+// Debug middleware
 app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path} from origin: ${req.headers.origin}`);
     console.log('Session ID:', req.sessionID);
-    console.log('Session data:', req.session);
     next();
+});
+
+// Health check route
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        cors_origins: [FRONT_END_URL, ADMIN_DASHBOARD_URL]
+    });
 });
 
 // Serve static files from the 'uploads' directory
@@ -87,7 +133,18 @@ app.get('/api/test-session', (req, res) => {
     res.json({
         sessionID: req.sessionID,
         session: req.session,
-        hasUser: !!req.session?.user
+        hasUser: !!req.session?.user,
+        headers: req.headers
+    });
+});
+
+// Catch-all route for debugging
+app.use('*', (req, res) => {
+    console.log('Unmatched route:', req.method, req.originalUrl);
+    res.status(404).json({ 
+        error: 'Route not found', 
+        method: req.method, 
+        path: req.originalUrl 
     });
 });
 
@@ -96,5 +153,8 @@ app.use(ErrorHandler);
 
 app.listen(PORT, async () => {
     console.log(`app is running on PORT: ${PORT}`);
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Admin Dashboard URL:', ADMIN_DASHBOARD_URL);
+    console.log('Frontend URL:', FRONT_END_URL);
     await DBConnect();
 });
