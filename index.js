@@ -22,8 +22,8 @@ import { ErrorHandler } from "./middleware/ErrorHandler.js";
 
 // config
 const PORT = process.env.PORT || 8080;
-const FRONT_END_URL = process.env.FRONT_END_URL || "http://localhost:3000";
-const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "http://localhost:5173";
+const FRONT_END_URL = process.env.FRONT_END_URL || "https://frontend-seven-alpha-49.vercel.app";
+const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "https://admin-gray-mu.vercel.app";
 
 const app = express();
 
@@ -41,7 +41,8 @@ app.use(
             const allowedOrigins = [
                 FRONT_END_URL, 
                 ADMIN_DASHBOARD_URL,
-                'https://admin-gray-mu.vercel.app', // Hardcode your admin URL as backup
+                'https://admin-gray-mu.vercel.app',
+                'https://frontend-seven-alpha-49.vercel.app',
                 'http://localhost:5173', // For local development
                 'http://localhost:3000'  // For local development
             ];
@@ -138,8 +139,8 @@ app.get('/api/test-session', (req, res) => {
     });
 });
 
-// Catch-all route for debugging
-app.use('*', (req, res) => {
+// Custom 404 handler (alternative to catch-all)
+app.use((req, res, next) => {
     console.log('Unmatched route:', req.method, req.originalUrl);
     res.status(404).json({ 
         error: 'Route not found', 
