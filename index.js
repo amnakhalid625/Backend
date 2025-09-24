@@ -25,6 +25,10 @@ const PORT = process.env.PORT || 8080;
 const FRONT_END_URL = process.env.FRONT_END_URL || "https://frontend-seven-alpha-49.vercel.app";
 const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "https://admin-gray-mu.vercel.app";
 
+// Remove trailing slashes to avoid CORS issues
+const cleanFrontendUrl = FRONT_END_URL.replace(/\/$/, '');
+const cleanAdminUrl = ADMIN_DASHBOARD_URL.replace(/\/$/, '');
+
 const app = express();
 
 // middlewares
@@ -39,9 +43,10 @@ app.use(
             if (!origin) return callback(null, true);
             
             const allowedOrigins = [
-                FRONT_END_URL, 
-                ADMIN_DASHBOARD_URL,
+                cleanFrontendUrl,
+                cleanAdminUrl,
                 'https://admin-gray-mu.vercel.app',
+                'https://adminnew-omega.vercel.app',
                 'https://frontend-seven-alpha-49.vercel.app',
                 'http://localhost:5173', // For local development
                 'http://localhost:3000'  // For local development
@@ -97,9 +102,10 @@ app.use(
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-            maxAge: 1000 * 60 * 60 * 24, // 24 hours
+            maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days (increased)
         },
         rolling: true,
+        name: 'sessionId' // Explicit session name
     })
 );
 

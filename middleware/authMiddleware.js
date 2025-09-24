@@ -7,12 +7,12 @@ const protect = AsyncHandler(async (req, res, next) => {
     console.log('Session data:', req.session);
     console.log('Session ID:', req.sessionID);
     console.log('Session user:', req.session?.user);
-    
+        
     if (req.session && req.session.user && req.session.user.id) {
         try {
             // Find user in DB from the ID stored in the session
             const user = await User.findById(req.session.user.id).select("-password");
-            
+                        
             if (user) {
                 console.log('User found:', user.email);
                 // Attach the user object to the request
@@ -35,7 +35,8 @@ const protect = AsyncHandler(async (req, res, next) => {
 const adminProtected = AsyncHandler(async (req, res, next) => {
     // Debug logging
     console.log('Admin check - Session data:', req.session);
-    
+    console.log('Admin check - Session user:', req.session?.user);
+        
     if (req.session && req.session.user && req.session.user.id) {
         try {
             const user = await User.findById(req.session.user.id).select("-password");
