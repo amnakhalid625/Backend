@@ -93,3 +93,26 @@ export const adminSignUp = AsyncHandler(async (req, res, next) => {
         return next(new ErrorResponse("Internal Server Error!", 500));
     }
 });
+export const logout = AsyncHandler(async (req, res, next) => {
+    try {
+        req.session.destroy((err) => {
+            if (err) {
+                return next(
+                    new ErrorResponse(
+                        "Something went wrong during logging out!",
+                        500
+                    )
+                );
+            }
+
+            res.clearCookie("sessionId"); // Match session name from index.js
+            return res.status(200).json({
+                success: true,
+                message: "User logged out successfully.",
+            });
+        });
+    } catch (error) {
+        console.log("ERROR IN LOGOUT : ", error.message);
+        return next(new ErrorResponse("Internal Server Error!", 500));
+    }
+});
