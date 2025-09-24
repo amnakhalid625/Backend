@@ -6,7 +6,6 @@ import Product from './models/productModel.js';
 import Order from './models/orderModel.js';
 import connectDB from './config/db.js';
 
-// IMPORTANT: We are importing the static data from your frontend folder.
 // Adjust the path if your folder structure is different.
 import { productsData } from '../frontend/src/constants/productsData.js';
 
