@@ -7,11 +7,15 @@ import ErrorResponse from "../utils/ErrorResponse.js";
 const createBanner = AsyncHandler(async (req, res, next) => {
     try {
         const { subtitle, description, backgroundColor, status } = req.body;
-        
+
         // ✅ CLOUDINARY CHANGE: Use Cloudinary URL instead of local path
         const image = req.file ? req.file.path : undefined;
-        
-        const title = req.body.title || (req.file ? req.file.originalname.split('.').slice(0, -1).join('.') : "Untitled");
+
+        const title =
+            req.body.title ||
+            (req.file
+                ? req.file.originalname.split(".").slice(0, -1).join(".")
+                : "Untitled");
 
         if (!image) {
             return next(new ErrorResponse("Image is required", 400));
@@ -33,8 +37,30 @@ const createBanner = AsyncHandler(async (req, res, next) => {
         });
     } catch (error) {
         console.error("Error creating banner:", error.message);
-        // ✅ Local file delete ki zaroorat nahi
         return next(new ErrorResponse("Internal Server Error", 500));
+    }
+});
+
+// Get all banners
+const getBanners = AsyncHandler(async (req, res, next) => {
+    try {
+        const banners = await Banner.find();
+        res.status(200).json({ success: true, banners });
+    } catch (error) {
+        return next(new ErrorResponse("Failed to fetch banners", 500));
+    }
+});
+
+// Get single banner by ID
+const getBannerById = AsyncHandler(async (req, res, next) => {
+    try {
+        const banner = await Banner.findById(req.params.id);
+        if (!banner) {
+            return next(new ErrorResponse("Banner not found", 404));
+        }
+        res.status(200).json({ success: true, banner });
+    } catch (error) {
+        return next(new ErrorResponse("Internal Server Error!", 500));
     }
 });
 
@@ -45,12 +71,10 @@ const updateBanner = AsyncHandler(async (req, res, next) => {
     const banner = await Banner.findById(req.params.id);
 
     if (!banner) {
-        // ✅ Local file delete ki zaroorat nahi
         return next(new ErrorResponse("Banner not found", 404));
     }
 
     if (req.file) {
-        // ✅ Old image Cloudinary se delete karne ki zaroorat nahi (optional)
         banner.image = req.file.path; // ✅ Cloudinary URL
     }
 
@@ -73,13 +97,16 @@ const deleteBanner = AsyncHandler(async (req, res, next) => {
         return next(new ErrorResponse("Banner not found", 404));
     }
 
-    // ✅ Local file delete ki zaroorat nahi
-    // Cloudinary pe image reh sakti hai (free tier mein sufficient space)
-
     await banner.deleteOne();
 
     res.status(200).json({ success: true, message: "Banner deleted" });
 });
 
-// getBanners aur getBannerById mein koi change nahi
-export { createBanner, getBanners, getBannerById, updateBanner, deleteBanner };
+// ✅ Now all functions are defined and exported
+export {
+    createBanner,
+    getBanners,
+    getBannerById,
+    updateBanner,
+    deleteBanner,
+};
