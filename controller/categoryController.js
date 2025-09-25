@@ -2,19 +2,17 @@ import Category from "../models/categoryModel.js";
 import AsyncHandler from "express-async-handler";
 import ErrorResponse from "../utils/ErrorResponse.js";
 
-// Create a new category
+// Create category
 const createCategory = AsyncHandler(async (req, res, next) => {
   try {
     const { name } = req.body;
-
-    const image = req.file ? req.file.path : undefined; // ✅ Cloudinary URL
+    const image = req.file ? req.file.path : undefined;
 
     if (!name) {
       return next(new ErrorResponse("Category name is required", 400));
     }
 
     const category = await Category.create({ name, image });
-
     res.status(201).json({
       success: true,
       message: "Category created successfully",
@@ -36,7 +34,7 @@ const getCategories = AsyncHandler(async (req, res, next) => {
   }
 });
 
-// Get single category by ID
+// Get single category
 const getCategoryById = AsyncHandler(async (req, res, next) => {
   try {
     const category = await Category.findById(req.params.id);
@@ -59,7 +57,7 @@ const updateCategory = AsyncHandler(async (req, res, next) => {
   }
 
   if (req.file) {
-    category.image = req.file.path; // ✅ Cloudinary URL
+    category.image = req.file.path;
   }
 
   category.name = name || category.name;
@@ -80,12 +78,11 @@ const deleteCategory = AsyncHandler(async (req, res, next) => {
   }
 
   await category.deleteOne();
-
   res.status(200).json({ success: true, message: "Category deleted" });
 });
 
-// ✅ EXPORT ALL
-export default {
+// ✅ Named Exports
+export {
   createCategory,
   getCategories,
   getCategoryById,

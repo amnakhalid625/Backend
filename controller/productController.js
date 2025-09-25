@@ -102,7 +102,6 @@ const createProduct = AsyncHandler(async (req, res, next) => {
       weight,
       dimensions,
       tags,
-      inStock,
     } = req.body;
 
     const images = req.files ? req.files.map((file) => file.path) : [];
@@ -215,8 +214,8 @@ const deleteProduct = AsyncHandler(async (req, res, next) => {
   }
 });
 
-// ✅ EXPORT ALL
-export default {
+// ✅ Named Exports
+export {
   getProducts,
   getProductById,
   createProduct,
