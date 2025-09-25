@@ -3,6 +3,94 @@ import Product from "../models/productModel.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
 // import { deleteFile } from "../utils/fileHelper.js"; // REMOVE THIS
 
+// Get all products
+export const getProducts = AsyncHandler(async (req, res, next) => {
+    try {
+        const {
+            keyword,
+            category,
+            brand,
+            minPrice,
+            maxPrice,
+            sort,
+        } = req.query;
+
+        let query = {};
+
+        if (keyword) {
+            query.$or = [
+                { name: { $regex: keyword, $options: "i" } },
+                { description: { $regex: keyword, $options: "i" } },
+            ];
+        }
+        if (category) query.category = category;
+        if (brand) query.brand = brand;
+        if (minPrice || maxPrice) {
+            query.price = {};
+            if (minPrice) query.price.$gte = Number(minPrice);
+            if (maxPrice) query.price.$lte = Number(maxPrice);
+        }
+
+        let sortOption = { createdAt: -1 };
+        if (sort) {
+            if (sort === "priceAsc") sortOption = { price: 1 };
+            else if (sort === "priceDesc") sortOption = { price: -1 };
+            else if (sort === "rating") sortOption = { averageRating: -1 };
+        }
+
+        const products = await Product.find(query).sort(sortOption);
+        const total = await Product.countDocuments(query);
+
+        res.json({
+            success: true,
+            products,
+            totalProducts: total,
+        });
+    } catch (error) {
+        console.log("Error in Get Products:", error.message);
+        return next(new ErrorResponse("Internal Server Error!", 500));
+    }
+});
+
+// Get single product by ID
+export const getProductById = AsyncHandler(async (req, res, next) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+            return next(new ErrorResponse("Product not found", 404));
+        }
+        res.status(200).json({ success: true, product });
+    } catch (error) {
+        return next(new ErrorResponse("Internal Server Error!", 500));
+    }
+});
+
+// Create product review
+export const createProductReview = AsyncHandler(async (req, res, next) => {
+    try {
+        const { rating, comment } = req.body;
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+            return next(new ErrorResponse("Product not found", 404));
+        }
+        const review = {
+            name: req.user.name,
+            rating: Number(rating),
+            comment,
+            user: req.user._id,
+        };
+        product.reviews.push(review);
+        const totalRating = product.reviews.reduce((acc, item) => item.rating + acc, 0);
+        product.averageRating = totalRating / product.reviews.length;
+        await product.save();
+        res.status(201).json({ message: "Review added successfully" });
+    } catch (error) {
+        console.error("Error creating product review:", error);
+        return next(new ErrorResponse("Could not add review", 500));
+    }    
+});
+
+// Create a new product
 export const createProduct = AsyncHandler(async (req, res, next) => {
     try {
         const { name, brand, category, subCategory, thirdLevelCategory, description, price, originalPrice, stockQuantity, sku, weight, dimensions, tags, inStock } = req.body;
@@ -32,6 +120,7 @@ export const createProduct = AsyncHandler(async (req, res, next) => {
     }
 });
 
+// Update product
 export const updateProduct = AsyncHandler(async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id);
@@ -71,6 +160,7 @@ export const updateProduct = AsyncHandler(async (req, res, next) => {
     }
 });
 
+// Delete product
 export const deleteProduct = AsyncHandler(async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id);
@@ -90,5 +180,12 @@ export const deleteProduct = AsyncHandler(async (req, res, next) => {
     }
 });
 
-// getProducts, getProductById, createProductReview mein koi change nahi
-export { getProducts, getProductById, createProductReview };
+// ✅ CORRECTED EXPORT - all functions included
+export { 
+    getProducts, 
+    getProductById, 
+    createProduct, 
+    updateProduct, 
+    deleteProduct, 
+    createProductReview
+};
