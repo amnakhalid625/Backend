@@ -88,24 +88,25 @@ app.use((req, res, next) => {
 });
 
 // Session configuration
+// Session configuration
 app.use(
     session({
-        secret: process.env.SESSION_SECRET || 'your-fallback-secret',
+        secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
         store: MongoStore.create({
             mongoUrl: process.env.MONGO_URI,
             collectionName: "sessions",
-            ttl: 14 * 24 * 60 * 60, // 14 days
+            ttl: 14 * 24 * 60 * 60,
         }),
         cookie: {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-            maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days (increased)
+            secure: true, // Always true for production HTTPS
+            sameSite: 'none', // Required for cross-origin
+            maxAge: 1000 * 60 * 60 * 24 * 7,
         },
         rolling: true,
-        name: 'sessionId' // Explicit session name
+        name: 'connect.sid'
     })
 );
 
