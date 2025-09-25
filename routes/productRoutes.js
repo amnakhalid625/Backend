@@ -8,8 +8,7 @@ import {
     createProductReview,
 } from "../controller/productController.js";
 import { adminProtected } from "../middleware/authMiddleware.js";
-// import upload from "../middleware/uploadMiddleware.js"; // REMOVE THIS
-import { uploadMultiple } from "../middleware/cloudinaryMiddleware.js"; // ADD THIS
+import upload from "../middleware/uploadMiddleware.js";
 
 const router = Router();
 
@@ -17,21 +16,23 @@ const router = Router();
 router.get("/", getProducts);
 router.get("/:id", getProductById);
 
-// Admin-only routes - Cloudinary use karein
+// Admin-only routes
 router.post(
     "/admin/create-product",
     adminProtected,
-    uploadMultiple, // Cloudinary multiple upload
+    upload.array("images", 10), // Allow up to 10 images
     createProduct
 );
 router.put(
     "/admin/:id",
     adminProtected,
-    uploadMultiple, // Cloudinary multiple upload
+    upload.array("images", 10),
     updateProduct
 );
 router.delete("/admin/:id", adminProtected, deleteProduct);
 
 router.post("/admin/:id/reviews", adminProtected, createProductReview);
+
+
 
 export default router;
