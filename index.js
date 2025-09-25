@@ -1,4 +1,4 @@
-// packages
+// server.js - Updated session configuration
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -23,33 +23,31 @@ import { ErrorHandler } from "./middleware/ErrorHandler.js";
 // config
 const PORT = process.env.PORT || 8080;
 const FRONT_END_URL = process.env.FRONT_END_URL || "https://frontend-seven-alpha-49.vercel.app";
-const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "https://admin-gray-mu.vercel.app";
-
-// Remove trailing slashes to avoid CORS issues
-const cleanFrontendUrl = FRONT_END_URL.replace(/\/$/, '');
-const cleanAdminUrl = ADMIN_DASHBOARD_URL.replace(/\/$/, '');
+const ADMIN_DASHBOARD_URL = process.env.ADMIN_DASHBOARD_URL || "https://adminnew-omega.vercel.app";
 
 const app = express();
+
+// Trust proxy for production (important for secure cookies)
+app.set('trust proxy', 1);
 
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Enhanced CORS configuration
+// Enhanced CORS configuration - MUST come before session middleware
 app.use(
     cors({
         origin: function (origin, callback) {
-            // Allow requests with no origin (like mobile apps or curl requests)
             if (!origin) return callback(null, true);
             
             const allowedOrigins = [
-                cleanFrontendUrl,
-                cleanAdminUrl,
+                FRONT_END_URL,
+                ADMIN_DASHBOARD_URL,
                 'https://admin-gray-mu.vercel.app',
                 'https://adminnew-omega.vercel.app',
                 'https://frontend-seven-alpha-49.vercel.app',
-                'http://localhost:5173', // For local development
-                'http://localhost:3000'  // For local development
+                'http://localhost:5173',
+                'http://localhost:3000'
             ];
             
             if (allowedOrigins.includes(origin)) {
@@ -67,19 +65,20 @@ app.use(
             'Accept',
             'Authorization',
             'Cache-Control',
-            'Pragma'
+            'Pragma',
+            'Cookie'
         ],
         credentials: true,
         optionsSuccessStatus: 200
     })
 );
 
-// Handle preflight requests explicitly - Fixed syntax
+// Handle preflight requests
 app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
         res.header('Access-Control-Allow-Origin', req.headers.origin);
         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie');
         res.header('Access-Control-Allow-Credentials', 'true');
         res.sendStatus(200);
     } else {
@@ -87,34 +86,37 @@ app.use((req, res, next) => {
     }
 });
 
-// Session configuration
-// Session configuration
+// FIXED Session configuration - key changes
 app.use(
     session({
-        secret: process.env.SESSION_SECRET,
+        name: 'admin.session', // Custom session name
+        secret: process.env.SESSION_SECRET || 'your-super-secret-key',
         resave: false,
         saveUninitialized: false,
         store: MongoStore.create({
             mongoUrl: process.env.MONGO_URI,
-            collectionName: "sessions",
-            ttl: 14 * 24 * 60 * 60,
+            collectionName: "admin_sessions", // Separate collection for admin sessions
+            ttl: 7 * 24 * 60 * 60, // 7 days
+            autoRemove: 'native'
         }),
         cookie: {
             httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 1000 * 60 * 60 * 24 * 7,
-            path: '/'  // Add this line
+            secure: process.env.NODE_ENV === 'production', // Only secure in production
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            path: '/'
         },
-        rolling: true,
-        name: 'connect.sid'
+        rolling: true // Reset expiration on activity
     })
 );
 
-// Debug middleware
+// Enhanced debug middleware
 app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path} from origin: ${req.headers.origin}`);
+    console.log(`\n=== ${req.method} ${req.path} ===`);
+    console.log('Origin:', req.headers.origin);
     console.log('Session ID:', req.sessionID);
+    console.log('Session User:', req.session?.user ? 'Present' : 'Not found');
+    console.log('Cookies:', req.headers.cookie ? 'Present' : 'None');
     next();
 });
 
@@ -124,11 +126,25 @@ app.get('/api/health', (req, res) => {
         status: 'OK', 
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV,
-        cors_origins: [FRONT_END_URL, ADMIN_DASHBOARD_URL]
+        session: {
+            id: req.sessionID,
+            hasUser: !!req.session?.user
+        }
     });
 });
 
-// Serve static files from the 'uploads' directory
+// Session test route
+app.get('/api/test-session', (req, res) => {
+    res.json({
+        sessionID: req.sessionID,
+        hasSession: !!req.session,
+        hasUser: !!req.session?.user,
+        user: req.session?.user || null,
+        cookies: req.headers.cookie
+    });
+});
+
+// Serve static files
 const __dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__dirname, "/uploads")));
 
@@ -141,17 +157,7 @@ app.use("/api/banner", bannerRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/admin", adminRoutes);
 
-// Test route to check session
-app.get('/api/test-session', (req, res) => {
-    res.json({
-        sessionID: req.sessionID,
-        session: req.session,
-        hasUser: !!req.session?.user,
-        headers: req.headers
-    });
-});
-
-// Custom 404 handler (alternative to catch-all)
+// 404 handler
 app.use((req, res, next) => {
     console.log('Unmatched route:', req.method, req.originalUrl);
     res.status(404).json({ 
@@ -165,7 +171,7 @@ app.use((req, res, next) => {
 app.use(ErrorHandler);
 
 app.listen(PORT, async () => {
-    console.log(`app is running on PORT: ${PORT}`);
+    console.log(`🚀 Server running on PORT: ${PORT}`);
     console.log('Environment:', process.env.NODE_ENV);
     console.log('Admin Dashboard URL:', ADMIN_DASHBOARD_URL);
     console.log('Frontend URL:', FRONT_END_URL);

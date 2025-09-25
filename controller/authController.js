@@ -93,6 +93,7 @@ export const logout = AsyncHandler(async (req, res, next) => {
     try {
         req.session.destroy((err) => {
             if (err) {
+                console.log('Session destroy error:', err);
                 return next(
                     new ErrorResponse(
                         "Something went wrong during logging out!",
@@ -101,7 +102,8 @@ export const logout = AsyncHandler(async (req, res, next) => {
                 );
             }
 
-            res.clearCookie("sessionId");
+            res.clearCookie("admin.session"); // Match the session name from server.js
+            res.clearCookie("connect.sid"); // Fallback for old sessions
             return res.status(200).json({
                 success: true,
                 message: "User logged out successfully.",
@@ -112,8 +114,6 @@ export const logout = AsyncHandler(async (req, res, next) => {
         return next(new ErrorResponse("Internal Server Error!", 500));
     }
 });
-
-
 
 export const adminSignUp = AsyncHandler(async (req, res, next) => {
     try {
@@ -149,11 +149,14 @@ export const adminSignUp = AsyncHandler(async (req, res, next) => {
     }
 });
 
-
-
+// FIXED: Enhanced admin login with better session handling
 export const adminLogin = AsyncHandler(async (req, res, next) => {
     try {
         const { email, password } = req.body;
+
+        console.log('\n=== ADMIN LOGIN ATTEMPT ===');
+        console.log('Email:', email);
+        console.log('Session ID before login:', req.sessionID);
 
         if (!email || !password) {
             return next(new ErrorResponse("Please provide email and password", 400));
@@ -162,19 +165,28 @@ export const adminLogin = AsyncHandler(async (req, res, next) => {
         const user = await User.findOne({ email });
 
         if (!user) {
+            console.log('User not found for email:', email);
             return next(new ErrorResponse("Invalid credentials", 401));
         }
 
         if (user.role !== "admin") {
+            console.log('User is not admin. Role:', user.role);
             return next(new ErrorResponse("Not authorized as admin", 403));
         }
 
         const isPasswordValid = await user.comparePassword(password);
         if (!isPasswordValid) {
+            console.log('Invalid password for user:', email);
             return next(new ErrorResponse("Invalid credentials", 401));
         }
 
-        // Set session data
+        // Clear any existing session first
+        if (req.session.user) {
+            console.log('Clearing existing session data');
+            delete req.session.user;
+        }
+
+        // Set new session data
         req.session.user = {
             id: user._id,
             name: user.name,
@@ -182,19 +194,20 @@ export const adminLogin = AsyncHandler(async (req, res, next) => {
             role: user.role,
         };
 
-        // Save session explicitly and send response
+        console.log('Setting session user:', req.session.user);
+
+        // Force session save and send response
         req.session.save((err) => {
             if (err) {
                 console.error('Admin session save error:', err);
                 return next(new ErrorResponse('Session error', 500));
             }
             
-            console.log('Admin session saved successfully:', req.session.user);
-            console.log('Session ID being sent:', req.sessionID);
+            console.log('✅ Admin session saved successfully');
+            console.log('Session ID after save:', req.sessionID);
+            console.log('Session user after save:', req.session.user);
             
-            // Explicitly set cookie header
-            res.setHeader('Set-Cookie', `connect.sid=s%3A${req.sessionID}; Path=/; HttpOnly; Secure; SameSite=None`);
-            
+            // Send success response
             res.status(200).json({
                 success: true,
                 message: "Admin logged in successfully",
@@ -204,10 +217,27 @@ export const adminLogin = AsyncHandler(async (req, res, next) => {
                     email: user.email,
                     role: user.role,
                 },
+                sessionId: req.sessionID // Include session ID for debugging
             });
         });
     } catch (error) {
-        console.log("ERROR IN ADMIN LOGIN : ", error.message);
+        console.log("ERROR IN ADMIN LOGIN:", error.message);
         return next(new ErrorResponse("Internal Server Error!", 500));
     }
+});
+
+// Add a session check endpoint for debugging
+export const checkSession = AsyncHandler(async (req, res, next) => {
+    console.log('\n=== SESSION CHECK ===');
+    console.log('Session ID:', req.sessionID);
+    console.log('Session data:', req.session);
+    console.log('User in session:', req.session?.user);
+    
+    res.json({
+        sessionId: req.sessionID,
+        hasSession: !!req.session,
+        hasUser: !!req.session?.user,
+        user: req.session?.user || null,
+        isAdmin: req.session?.user?.role === 'admin'
+    });
 });
