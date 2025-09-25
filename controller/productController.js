@@ -1,7 +1,6 @@
 import AsyncHandler from "express-async-handler";
 import Product from "../models/productModel.js";
 import ErrorResponse from "../utils/ErrorResponse.js";
-// import { deleteFile } from "../utils/fileHelper.js"; // REMOVE THIS
 
 // Get all products
 export const getProducts = AsyncHandler(async (req, res, next) => {
@@ -168,7 +167,6 @@ export const deleteProduct = AsyncHandler(async (req, res, next) => {
             return next(new ErrorResponse("Product not found", 404));
         }
 
-        // ✅ Local file delete ki zaroorat nahi
         await product.deleteOne();
         
         res.json({ 
@@ -179,13 +177,3 @@ export const deleteProduct = AsyncHandler(async (req, res, next) => {
         return next(new ErrorResponse("Internal Server Error!", 500));
     }
 });
-
-// ✅ CORRECTED EXPORT - all functions included
-export { 
-    getProducts, 
-    getProductById, 
-    createProduct, 
-    updateProduct, 
-    deleteProduct, 
-    createProductReview
-};
