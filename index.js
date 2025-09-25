@@ -101,9 +101,10 @@ app.use(
         }),
         cookie: {
             httpOnly: true,
-            secure: true, // Always true for production HTTPS
-            sameSite: 'none', // Required for cross-origin
+            secure: true,
+            sameSite: 'none',
             maxAge: 1000 * 60 * 60 * 24 * 7,
+            path: '/'  // Add this line
         },
         rolling: true,
         name: 'connect.sid'
