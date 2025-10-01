@@ -10,5 +10,13 @@ const router = Router();
 // Dashboard Stats
 router.get("/stats", adminProtected, getDashboardStats);
 router.get("/statics", adminProtected, getDashboardChartData);
+router.get("/session-test", (req, res) => {
+    res.json({
+        sessionId: req.sessionID,
+        hasSession: !!req.session,
+        hasUser: !!req.session?.user,
+        userEmail: req.session?.user?.email || null
+    });
+});
 
 export default router;

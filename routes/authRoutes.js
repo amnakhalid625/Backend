@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { checkSession } from "../controller/authController.js";
 
 // controllers
 import {
@@ -16,6 +17,7 @@ const router = Router();
 router.get("/test", (req, res) => {
     res.json({ message: "Auth route is working!" });
 });
+router.get("/test-session", checkSession);
 
 router.post("/sign-up", signUp);
 router.post("/sign-in", signIn);
